@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import '../models/gesture_sign.dart';
 import 'status_chip.dart';
 
@@ -18,8 +17,9 @@ class LiveMonitorCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      margin: EdgeInsets.zero, // Prevent outer margin issues
       child: Container(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
           gradient: const LinearGradient(
@@ -33,15 +33,17 @@ class LiveMonitorCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.sensors_rounded, color: Color(0xFF0D3B66)),
+                const Icon(Icons.sensors_rounded, color: Color(0xFF0D3B66), size: 20),
                 const SizedBox(width: 8),
-                Text(
-                  'Arduino Gesture Stream',
-                  style: Theme.of(context).textTheme.titleMedium,
+                Expanded(
+                  child: Text(
+                    'Arduino Stream',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 14),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-                const Spacer(),
                 StatusChip(
-                  text: arduinoConnected ? 'Connected' : 'Disconnected',
+                  text: arduinoConnected ? 'Connected' : 'Offline',
                   color: arduinoConnected
                       ? const Color(0xFF2F9E44)
                       : const Color(0xFFD64545),
@@ -52,17 +54,17 @@ class LiveMonitorCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            _InfoRow(label: 'Detected Sign', value: sign.label),
+            _InfoRow(label: 'Sign', value: sign.label),
             const SizedBox(height: 10),
-            _InfoRow(label: 'Expected Angle', value: sign.angleHint),
+            _InfoRow(label: 'Expected', value: sign.angleHint),
             const SizedBox(height: 10),
-            _InfoRow(label: 'Current Angle', value: '$currentAngle degrees'),
+            _InfoRow(label: 'Current', value: '$currentAngle°'),
             const SizedBox(height: 16),
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: LinearProgressIndicator(
                 value: (currentAngle.clamp(0, 90)) / 90,
-                minHeight: 10,
+                minHeight: 8,
                 backgroundColor: const Color(0xFFDDEAF3),
                 color: sign.color,
               ),
@@ -83,20 +85,26 @@ class _InfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start, // Align to top if text wraps
       children: [
         Expanded(
+          flex: 2, // Takes up 40% of space
           child: Text(
             label,
-            style: Theme.of(context).textTheme.bodyMedium,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: const Color(0xFF486378),
+            ),
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 8),
         Expanded(
+          flex: 3, // Takes up 60% of space
           child: Text(
             value,
             textAlign: TextAlign.right,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   fontWeight: FontWeight.w700,
+                  fontSize: 13,
                   color: const Color(0xFF19354A),
                 ),
           ),
