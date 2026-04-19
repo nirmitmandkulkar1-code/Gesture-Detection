@@ -15,6 +15,7 @@ subprojects {
     val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
+
 subprojects {
     project.evaluationDependsOn(":app")
 }
@@ -23,21 +24,31 @@ tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
 
+// Fix missing namespace for old packages like flutter_bluetooth_serial
 subprojects {
-    val setupNamespace = {
-        if (project.hasProperty("android")) {
-            val android = project.extensions.getByName("android") as com.android.build.gradle.BaseExtension
-            if (android.namespace == null) {
-                android.namespace = project.group.toString()
+   val configureFixes = {
+    if (project.hasProperty("android")) {
+        val android = project.extensions.getByName("android") as com.android.build.gradle.BaseExtension
+
+        // Fix missing namespace
+        if (android.namespace == null) {
+            android.namespace = android.defaultConfig.applicationId
+                ?: project.group.toString().ifEmpty { "com.placeholder.${project.name}" }
+        }
+    }
+}
+    // Fix lStar error: force older androidx.core that doesn't need lStar
+    configurations.all {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "androidx.core") {
+                useVersion("1.9.0")
             }
         }
     }
 
-    // If the project is already evaluated, run the logic immediately.
-    // Otherwise, wait for evaluation to finish.
     if (project.state.executed) {
-        setupNamespace()
+        configureFixes()
     } else {
-        project.afterEvaluate { setupNamespace() }
+        project.afterEvaluate { configureFixes() }
     }
 }
