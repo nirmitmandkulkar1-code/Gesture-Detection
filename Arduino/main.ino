@@ -12,7 +12,7 @@ DFRobotDFPlayerMini myDFPlayer;
 
 // Thresholds
 int t1 = 910;   
-int t2 = 926;
+int t2 = 940;
 int t3 = 865;
 int t4 = 914;
 
@@ -63,7 +63,7 @@ void loop() {
     lcd.setCursor(0, 0);
     lcd.print("Finger 2");
     lcd.setCursor(0, 1);
-    lcd.print("PAIN ALERT");
+    lcd.print("NEED DOCTOR");
 
     myDFPlayer.play(2); // 0002.mp3
     delay(2000);
@@ -75,7 +75,7 @@ void loop() {
     lcd.setCursor(0, 0);
     lcd.print("Finger 3");
     lcd.setCursor(0, 1);
-    lcd.print("NEED ASSISTANCE");
+    lcd.print("PAIN ALERT");
 
     myDFPlayer.play(3); // 0003.mp3
     delay(2000);
@@ -87,7 +87,7 @@ void loop() {
     lcd.setCursor(0, 0);
     lcd.print("Finger 4");
     lcd.setCursor(0, 1);
-    lcd.print("WANT TO GO WASHROOM");
+    lcd.print("NEED ASSISTANCE");
 
     myDFPlayer.play(4); // 0004.mp3
     delay(2000);

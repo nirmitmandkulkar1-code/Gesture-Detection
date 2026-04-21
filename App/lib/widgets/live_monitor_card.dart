@@ -7,17 +7,21 @@ class LiveMonitorCard extends StatelessWidget {
     super.key,
     required this.sign,
     required this.arduinoConnected,
+    // FIX: receives the raw analog sensor value (0–1023), not a pre-divided angle
     required this.currentAngle,
   });
 
   final GestureSign sign;
   final bool arduinoConnected;
-  final int currentAngle;
+  final int currentAngle; // raw analog value 0–1023
 
   @override
   Widget build(BuildContext context) {
+    // Map raw 0–1023 range to a 0.0–1.0 progress fraction
+    final double progress = (currentAngle.clamp(0, 1023)) / 1023;
+
     return Card(
-      margin: EdgeInsets.zero, // Prevent outer margin issues
+      margin: EdgeInsets.zero,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -33,12 +37,16 @@ class LiveMonitorCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.sensors_rounded, color: Color(0xFF0D3B66), size: 20),
+                const Icon(Icons.sensors_rounded,
+                    color: Color(0xFF0D3B66), size: 20),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Arduino Stream',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 14),
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontSize: 14),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -58,12 +66,13 @@ class LiveMonitorCard extends StatelessWidget {
             const SizedBox(height: 10),
             _InfoRow(label: 'Expected', value: sign.angleHint),
             const SizedBox(height: 10),
-            _InfoRow(label: 'Current', value: '$currentAngle°'),
+            // Show the raw sensor reading, not an artificial degree value
+            _InfoRow(label: 'Sensor', value: currentAngle.toString()),
             const SizedBox(height: 16),
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: LinearProgressIndicator(
-                value: (currentAngle.clamp(0, 90)) / 90,
+                value: progress,
                 minHeight: 8,
                 backgroundColor: const Color(0xFFDDEAF3),
                 color: sign.color,
@@ -85,20 +94,20 @@ class _InfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start, // Align to top if text wraps
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          flex: 2, // Takes up 40% of space
+          flex: 2,
           child: Text(
             label,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: const Color(0xFF486378),
-            ),
+                  color: const Color(0xFF486378),
+                ),
           ),
         ),
         const SizedBox(width: 8),
         Expanded(
-          flex: 3, // Takes up 60% of space
+          flex: 3,
           child: Text(
             value,
             textAlign: TextAlign.right,

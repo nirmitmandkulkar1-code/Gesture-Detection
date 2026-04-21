@@ -6,9 +6,12 @@ class SpeechOutputCard extends StatelessWidget {
   const SpeechOutputCard({
     super.key,
     required this.sign,
+    // FIX #6: accept a callback so the Play button actually speaks
+    required this.onPlay,
   });
 
   final GestureSign sign;
+  final VoidCallback onPlay;
 
   @override
   Widget build(BuildContext context) {
@@ -36,8 +39,9 @@ class SpeechOutputCard extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const Spacer(),
+                // FIX #6: onPressed now wired to onPlay
                 FilledButton.icon(
-                  onPressed: () {},
+                  onPressed: onPlay,
                   icon: const Icon(Icons.play_arrow_rounded),
                   label: const Text('Play'),
                   style: FilledButton.styleFrom(
