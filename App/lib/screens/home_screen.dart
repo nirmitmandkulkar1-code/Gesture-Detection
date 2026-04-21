@@ -5,7 +5,9 @@ import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
 import '../data/mock_signs.dart';
+import '../models/gesture_log_entry.dart';
 import '../theme/app_theme.dart';
+import '../widgets/gesture_log_card.dart';
 import '../widgets/live_monitor_card.dart';
 import '../widgets/section_header.dart';
 import '../widgets/sign_card.dart';
@@ -22,16 +24,17 @@ class _HomeScreenState extends State<HomeScreen> {
   BluetoothConnection? connection;
   bool isConnecting = false;
   bool arduinoConnected = false;
-
-  // FIX #3: buffer is now drained properly in _onDataReceived
   String _buffer = '';
 
   int selectedSignIndex = 0;
   int currentSensorValue = 0;
+
+  // Gesture history — newest entry at index 0
+  final List<GestureLogEntry> _gestureLog = [];
+
   final FlutterTts flutterTts = FlutterTts();
 
-  // ── Arduino thresholds ──────────────────────────────────────────────────────
-  // FIX #2: Match the exact values used in the Arduino sketch
+  // Arduino thresholds — match the sketch exactly
   static const int _t1 = 910;
   static const int _t2 = 940;
   static const int _t3 = 865;
@@ -58,7 +61,8 @@ class _HomeScreenState extends State<HomeScreen> {
   void _startConnection() async {
     setState(() => isConnecting = true);
     try {
-      final devices = await FlutterBluetoothSerial.instance.getBondedDevices();
+      final devices =
+          await FlutterBluetoothSerial.instance.getBondedDevices();
       BluetoothDevice? server;
       try {
         server = devices.firstWhere(
@@ -93,38 +97,25 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ── Data parsing ─────────────────────────────────────────────────────────────
 
-  // FIX #3: Properly drain the buffer so no lines are lost when two arrive
-  // together in a single Bluetooth chunk.
   void _onDataReceived(Uint8List data) {
     _buffer += utf8.decode(data);
     while (_buffer.contains('\n')) {
       final idx = _buffer.indexOf('\n');
       final line = _buffer.substring(0, idx).trim();
-      _buffer = _buffer.substring(idx + 1); // keep remainder, don't discard
+      _buffer = _buffer.substring(idx + 1);
       if (line.isNotEmpty) _processArduinoCommand(line);
     }
   }
 
-  // FIX #1: Arduino sends  "S1: 910 | S2: 940 | S3: 865 | S4: 914"
-  //   • parts are separated by " | "
-  //   • key and value are separated by ": " (colon + space)
-  // FIX #2: Thresholds now match the Arduino sketch values exactly.
-  // FIX #4: currentSensorValue now tracks whichever sensor actually fired,
-  //         not always S1.
-  // FIX #5: _playVoiceOutput() is called AFTER setState, not inside it.
+  // Arduino sends: "S1: 910 | S2: 123 | S3: 45 | S4: 67"
   void _processArduinoCommand(String command) {
     try {
-      // Split on " | " to get ["S1: 910", "S2: 940", ...]
       final parts = command.split(' | ');
       final sensors = <String, int>{};
-
       for (final part in parts) {
-        // Split on ': ' (colon + space)
         final kv = part.split(': ');
         if (kv.length == 2) {
-          final key = kv[0].trim();       // "S1"
-          final val = int.tryParse(kv[1].trim()) ?? 0;
-          sensors[key] = val;
+          sensors[kv[0].trim()] = int.tryParse(kv[1].trim()) ?? 0;
         }
       }
 
@@ -146,13 +137,26 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       if (newIndex != selectedSignIndex) {
-        // FIX #5: setState only contains synchronous state updates
+        final detected = medicalSigns[newIndex];
+
         setState(() {
           selectedSignIndex = newIndex;
           currentSensorValue = triggeredValue;
+          // Prepend so latest is always at index 0
+          _gestureLog.insert(
+            0,
+            GestureLogEntry(
+              label: detected.label,
+              phrase: detected.phrase,
+              sensorValue: triggeredValue,
+              timestamp: DateTime.now(),
+            ),
+          );
+          // Cap log at 50 entries to avoid memory growth
+          if (_gestureLog.length > 50) _gestureLog.removeLast();
         });
-        // Async TTS call lives outside setState
-        _playVoiceOutput(medicalSigns[newIndex].phrase);
+
+        _playVoiceOutput(detected.phrase);
       }
     } catch (e) {
       debugPrint('Parsing error: $e');
@@ -188,23 +192,21 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   _TopBanner(arduinoConnected: arduinoConnected),
                   const SizedBox(height: 20),
+
+                  // ── Gesture grid ──────────────────────────────────────────
                   SectionHeader(
                     title: 'Hospital Gestures',
                     subtitle: 'Mapped to voice output',
                     trailing: TextButton.icon(
                       onPressed: isConnecting ? null : _toggleBluetooth,
-                      icon: Icon(
-                        isConnecting
-                            ? Icons.sync
-                            : (arduinoConnected
-                                ? Icons.bluetooth_connected
-                                : Icons.bluetooth_disabled),
-                      ),
-                      label: Text(
-                        isConnecting
-                            ? '...'
-                            : (arduinoConnected ? 'Off' : 'Connect'),
-                      ),
+                      icon: Icon(isConnecting
+                          ? Icons.sync
+                          : (arduinoConnected
+                              ? Icons.bluetooth_connected
+                              : Icons.bluetooth_disabled)),
+                      label: Text(isConnecting
+                          ? '...'
+                          : (arduinoConnected ? 'Off' : 'Connect')),
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -229,6 +231,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   ),
                   const SizedBox(height: 24),
+
+                  // ── Live monitor ──────────────────────────────────────────
                   const SectionHeader(
                     title: 'Live Recognition Monitor',
                     subtitle: 'Hardware stream analysis',
@@ -237,15 +241,27 @@ class _HomeScreenState extends State<HomeScreen> {
                   LiveMonitorCard(
                     sign: selectedSign,
                     arduinoConnected: arduinoConnected,
-                    // Raw sensor value passed directly; LiveMonitorCard clamps
-                    // it to the 0-1023 analog range for its progress bar.
                     currentAngle: currentSensorValue,
                   ),
                   const SizedBox(height: 14),
-                  // FIX #6: onPlay callback wired to TTS
+
+                  // ── Voice preview ─────────────────────────────────────────
                   SpeechOutputCard(
                     sign: selectedSign,
                     onPlay: () => _playVoiceOutput(selectedSign.phrase),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // ── Gesture history log ───────────────────────────────────
+                  const SectionHeader(
+                    title: 'Gesture History',
+                    subtitle: 'All detected gestures this session',
+                  ),
+                  const SizedBox(height: 10),
+                  GestureLogCard(
+                    entries: _gestureLog,
+                    signs: medicalSigns,
+                    onClear: () => setState(() => _gestureLog.clear()),
                   ),
                 ],
               ),
